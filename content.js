@@ -9,7 +9,12 @@ function adjustSpeed(video, increment) {
   let speed = video.playbackRate + increment;
   speed = Math.max(0.25, Math.min(4.0, speed));
   video.playbackRate = speed;
-  return speed;
+  const label =
+    video.parentNode.querySelector(".speedlabel") ||
+    document.createElement("div");
+  label.className = "speedlabel";
+  label.textContent = `${speed.toFixed(2)}x`;
+  video.parentNode.appendChild(label);
 }
 
 function createSpeedUI(video) {
