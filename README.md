@@ -10,15 +10,15 @@ A Chrome extension to control video playback speed and bookmark specific timesta
 
 ## Usage
 ### 1. Speed Control:
-- Increase Speed: Press D to increase the playback speed by 0.1x.
-- Decrease Speed: Press A to decrease the playback speed by 0.1x.
-- Reset Speed: Press S to reset the speed to 1x.
-- Skip Forward: Press E to skip forward by 10 seconds.
-- Rewind: Press Q to rewind by 10 seconds.
+- Increase Speed: Press `D` to increase the playback speed by 0.1x.
+- Decrease Speed: Press `A` to decrease the playback speed by 0.1x.
+- Reset Speed: Press `S` to reset the speed to 1x.
+- Skip Forward: Press `E` to skip forward by 10 seconds.
+- Rewind: Press `Q` to rewind by 10 seconds.
 ### 2. Bookmark Timestamps:
-- Save Timestamp: Press B to save the current timestamp while watching a video.
-- Play Timestamp: You can either click "Run" on a saved bookmark or press the key associated with the timestamp (1 - 3).
-- View Bookmarks: Open the extension popup and navigate to the "Bookmarks" tab to see all your saved timestamps.
+- Save Timestamp: Press `B` to save the current timestamp while watching a video.
+- Play Timestamp: You can either click `Run` on a saved bookmark or press the key associated with the timestamp (1 - 3).
+- View Bookmarks: Open the extension popup and navigate to the `Bookmarks` tab to see all your saved timestamps.
 
 ## Installation
 ### 1. Clone the Repository
