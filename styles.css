@@ -1,63 +1,172 @@
 body {
-    font-family: Arial, sans-serif;
-    padding: 10px;
-    width: 300px;
-  }
-  
-  h2 {
-    margin-top: 0;
-  }
-  
-  button {
-    margin: 5px;
-    padding: 5px 10px;
-    cursor: pointer;
-    border: none;
-    border-radius: 5px;
-    background: #007bff;
-    color: white;
-    transition: 0.2s;
-  }
-  
-  button:hover {
-    background: #0056b3;
-  }
-  
-  ul {
-    list-style-type: none;
-    padding: 0;
-  }
-  
-  li {
-    margin: 5px 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .speedlabel {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.85);
-    color: white;
-    padding: 5px 10px;
-    font-size: 14px;
-    font-weight: bold;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    display: block;
-    pointer-events: none;
-  }
-  
-  .dark-mode {
-    background-color: #333;
-    color: #fff;
-  }
-  
-  .dark-mode button {
-    background-color: #555;
-    color: #fff;
-  }
-  
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 15px;
+  width: 350px;
+  background-color: #f4f4f4;
+  color: #333;
+}
+
+h2 {
+  color: #007bff;
+  margin-bottom: 20px;
+  margin-top: 0; 
+}
+
+button {
+  padding: 8px 15px;
+  margin: 5px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  margin: 5px 0;
+}
+
+.container {
+  padding: 10px; 
+}
+
+.bookmarks-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+.site-container {
+  margin: 10px 0; 
+}
+
+.timestamp-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.timestamp-item:last-child {
+  border-bottom: none;
+}
+
+.run-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.run-button:hover {
+  background-color: #218838;
+}
+
+.delete-button {
+  background-color: #dc3545;
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: #c82333;
+}
+
+.theme-toggle {
+  background-color: #6c757d;
+  color: white;
+  width: 100%;
+}
+
+.theme-toggle:hover {
+  background-color: #5a6268;
+}
+
+.empty-message {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  padding: 10px;
+}
+
+.error-message {
+  text-align: center;
+  color: #f00;
+  font-style: italic;
+  padding: 10px;
+}
+
+.speedlabel {
+  position: absolute;
+  top: 20px;
+  right: 20px; 
+  background: rgba(255, 255, 255, 0.3);
+  color: #333;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  display: block;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode {
+  background-color: #333;
+  color: #eee;
+}
+
+.dark-mode .bookmarks-container {
+  border-color: #555;
+}
+
+.dark-mode .timestamp-item {
+  border-bottom-color: #444;
+}
+
+.dark-mode h2 {
+  color: #89cff0;
+}
+
+.dark-mode button {
+  background-color: #555;
+  color: #fff;
+}
+
+.dark-mode .run-button {
+  background-color: #388e3c;
+}
+
+.dark-mode .run-button:hover {
+  background-color: #2e7d32;
+}
+
+.dark-mode .delete-button {
+  background-color: #d32f2f;
+}
+
+.dark-mode .delete-button:hover {
+  background-color: #b71c1c;
+}
+
+.dark-mode .theme-toggle {
+  background-color: #555;
+}
+
+.dark-mode .theme-toggle:hover {
+  background-color: #444;
+}
+
+.dark-mode .speedlabel {
+  background: rgba(0, 0, 0, 0.7);
+  color: #eee;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}

@@ -1,100 +1,103 @@
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Popup loaded");
-
   const bookmarksDiv = document.getElementById("bookmarks");
+  const noBookmarksMessage = document.getElementById("noBookmarksMessage");
 
   function updateBookmarks() {
-    console.log("Updating bookmarks...");
-
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length === 0) {
         console.error("No active tab found.");
+        bookmarksDiv.innerHTML =
+          "<p class='error-message'>No active tab found.</p>";
         return;
       }
 
       const currentTab = tabs[0];
       const currentUrl = currentTab.url;
-      console.log("Current tab URL:", currentUrl);
 
       chrome.storage.sync.get(["bookmarks"], (result) => {
         const bookmarks = result.bookmarks || {};
-        console.log("Fetched bookmarks:", bookmarks);
-
         bookmarksDiv.innerHTML = "";
+        noBookmarksMessage.style.display = "none";
 
-        const siteNames = Object.keys(bookmarks);
-        if (siteNames.length === 0) {
-          bookmarksDiv.innerHTML = "<p>No timestamps saved yet.</p>";
-        } else {
-          siteNames.forEach((site) => {
-            const siteContainer = document.createElement("div");
-            siteContainer.style.marginBottom = "10px";
+        const timestamps = bookmarks[currentUrl] || []; // Show only current URL
+        if (timestamps.length === 0) {
+          noBookmarksMessage.style.display = "block";
+          return;
+        }
 
-            const siteTitle = document.createElement("h3");
-            siteTitle.textContent = site;
-            siteContainer.appendChild(siteTitle);
+        const ul = document.createElement("ul");
+        timestamps.forEach((time, index) => {
+          const li = document.createElement("li");
+          li.className = "timestamp-item";
+          li.textContent = `Timestamp ${index + 1} (${time.toFixed(2)}s)`;
 
-            const timestamps = bookmarks[site] || [];
-            const ul = document.createElement("ul");
+          const runButton = document.createElement("button");
+          runButton.textContent = "Run";
+          runButton.className = "run-button";
+          runButton.onclick = () =>
+            playTimestamp(currentUrl, index, currentUrl); // Use index
 
-            timestamps.forEach((time, index) => {
-              const li = document.createElement("li");
-              li.textContent = `Timestamp ${index + 1} (${time.toFixed(2)}s)`;
+          const deleteButton = document.createElement("button");
+          deleteButton.textContent = "Delete";
+          deleteButton.className = "delete-button";
+          deleteButton.onclick = () => deleteTimestamp(currentUrl, index);
 
-              const runButton = document.createElement("button");
-              runButton.textContent = "Run";
-              runButton.style.marginLeft = "10px";
-              runButton.onclick = () => {
-                console.log(
-                  `Playing timestamp ${index} at ${time}s from ${site}`
-                );
+          li.appendChild(runButton);
+          li.appendChild(deleteButton);
+          ul.appendChild(li);
+        });
+        bookmarksDiv.appendChild(ul);
+      });
+    });
+  }
 
-                if (currentUrl !== site) {
-                  console.log(`Navigating to ${site}`);
-                  chrome.tabs.create({ url: site }, (newTab) => {
-                    console.log("New tab opened:", newTab);
-                    setTimeout(() => {
-                      chrome.tabs.sendMessage(newTab.id, {
-                        action: "playTimestamp",
-                        time,
-                      });
-                    }, 2000);
-                  });
-                } else {
-                  console.log(
-                    "Sending playTimestamp message to content script"
-                  );
-                  chrome.tabs.sendMessage(currentTab.id, {
-                    action: "playTimestamp",
-                    time,
-                  });
-                }
-              };
-
-              const deleteButton = document.createElement("button");
-              deleteButton.textContent = "Delete";
-              deleteButton.style.marginLeft = "10px";
-              deleteButton.onclick = () => {
-                console.log(`Deleting timestamp ${index} from ${site}`);
-                timestamps.splice(index, 1);
-                if (timestamps.length === 0) {
-                  delete bookmarks[site];
-                } else {
-                  bookmarks[site] = timestamps;
-                }
-                chrome.storage.sync.set({ bookmarks }, updateBookmarks);
-              };
-
-              li.appendChild(runButton);
-              li.appendChild(deleteButton);
-              ul.appendChild(li);
-            });
-
-            siteContainer.appendChild(ul);
-            bookmarksDiv.appendChild(siteContainer);
+  function playTimestamp(site, index, currentUrl) {
+    // Change time to index
+    if (currentUrl !== site) {
+      chrome.tabs.create({ url: site }, (newTab) => {
+        const checkTabLoaded = setInterval(() => {
+          chrome.tabs.get(newTab.id, (tab) => {
+            if (tab.status === "complete") {
+              clearInterval(checkTabLoaded);
+              sendPlayMessage(newTab.id, index); // Send index instead of time
+            }
           });
+        }, 500);
+      });
+    } else {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs.length > 0) {
+          sendPlayMessage(tabs[0].id, index); // Send index instead of time
         }
       });
+    }
+  }
+
+  function sendPlayMessage(tabId, index) {
+    // Change time to index
+    chrome.tabs.sendMessage(
+      tabId,
+      { action: "playTimestamp", index }, // Send index instead of time
+      (response) => {
+        if (chrome.runtime.lastError) {
+          alert("Error: Video not found or page not fully loaded.");
+        }
+      }
+    );
+  }
+  function deleteTimestamp(site, index) {
+    chrome.storage.sync.get(["bookmarks"], (result) => {
+      const bookmarks = result.bookmarks || {};
+      const timestamps = bookmarks[site] || [];
+      timestamps.splice(index, 1);
+
+      if (timestamps.length === 0) {
+        delete bookmarks[site];
+      } else {
+        bookmarks[site] = timestamps;
+      }
+
+      chrome.storage.sync.set({ bookmarks }, updateBookmarks);
     });
   }
 
