@@ -1,11 +1,10 @@
-// ฟังก์ชันหาแท็ก <video> บนหน้าเว็บ
+// === Utility Functions ===
 function getVideo() {
   const videos = document.querySelectorAll("video");
-  if (videos.length > 0) return videos[0]; // ใช้ video แรก (ปรับปรุงได้ถ้ามีหลาย video)
-  return null;
+  return videos.length > 0 ? videos[0] : null;
 }
 
-// ปรับความเร็ววิดีโอ
+// === Speed Control Feature ===
 function adjustSpeed(video, increment) {
   let speed = video.playbackRate + increment;
   speed = Math.max(0.25, Math.min(4.0, speed));
@@ -13,83 +12,125 @@ function adjustSpeed(video, increment) {
   return speed;
 }
 
-// บันทึก Time Stamp
-function saveTimestamp() {
+function createSpeedUI(video) {
+  const container = video.parentNode;
+  let speedLabel = container.querySelector(".speedlabel");
+
+  if (!speedLabel) {
+    speedLabel = document.createElement("div");
+    speedLabel.className = "speedlabel";
+    container.appendChild(speedLabel);
+  }
+
+  speedLabel.textContent = `${video.playbackRate.toFixed(2)}x`;
+  speedLabel.style.display = "block";
+
+  video.onratechange = () => {
+    speedLabel.textContent = `${video.playbackRate.toFixed(2)}x`;
+  };
+}
+
+// === Bookmark Feature ===
+function saveTimestamp(currentUrl) {
   const video = getVideo();
   if (!video) return;
 
   const time = video.currentTime;
-  let timestamps = JSON.parse(localStorage.getItem("timestamps") || "[]");
-  timestamps.push(time);
-  localStorage.setItem("timestamps", JSON.stringify(timestamps));
-  console.log("Timestamp saved:", time);
+  chrome.storage.sync.get(["bookmarks"], (result) => {
+    let bookmarks = result.bookmarks || {};
+    if (!bookmarks[currentUrl]) bookmarks[currentUrl] = [];
+    bookmarks[currentUrl].push(time);
+    chrome.storage.sync.set({ bookmarks }, () => {
+      console.log("Timestamp saved:", time, "for URL:", currentUrl);
+    });
+  });
 }
 
-// เล่นจาก Time Stamp
-function playFromTimestamp(index) {
+function playFromTimestamp(currentUrl, index) {
   const video = getVideo();
   if (!video) return;
 
-  const timestamps = JSON.parse(localStorage.getItem("timestamps") || "[]");
-  if (timestamps[index] !== undefined) {
-    video.current英語Time = timestamps[index];
-    setTimeout(() => {
-      video.play();
-    }, 100); // เพิ่ม delay 100ms เพื่อความเสถียร
-    console.log(`Playing Timestamp ${index + 1}: ${timestamps[index]}`);
-  } else {
-    console.log(`No timestamp at index ${index}`);
-  }
+  chrome.storage.sync.get(["bookmarks"], (result) => {
+    const bookmarks = result.bookmarks || {};
+    const timestamps = bookmarks[currentUrl] || [];
+    if (timestamps[index] !== undefined) {
+      video.currentTime = timestamps[index];
+      setTimeout(() => video.play(), 100);
+      console.log(`Playing Timestamp ${index + 1}: ${timestamps[index]}s`);
+    }
+  });
 }
 
-// ฟังก์ชันจัดการคีย์บอร์ด
+// === Keyboard Shortcuts ===
 document.addEventListener(
   "keydown",
   (event) => {
     const video = getVideo();
     if (!video) return;
 
-    if (event.key === "b") {
-      saveTimestamp();
-    } else if (event.key === "x" && event.getModifierState("Z")) {
-      event.preventDefault(); // ป้องกันการทับซ้อนกับคีย์ของเว็บ
-      playFromTimestamp(0);
-    } else if (event.key === "c" && event.getModifierState("Z")) {
-      event.preventDefault(); // ป้องกันการทับซ้อนกับคีย์ของเว็บ
-      playFromTimestamp(1);
-    } else if (event.key === "v" && event.getModifierState("Z")) {
-      event.preventDefault(); // ป้องกันการทับซ้อนกับคีย์ของเว็บ
-      playFromTimestamp(2);
-    } else if (event.key === "d") {
-      const newSpeed = adjustSpeed(video, 0.25);
-      console.log(`Speed increased to ${newSpeed}x`);
-    } else if (event.key === "a") {
-      const newSpeed = adjustSpeed(video, -0.25);
-      console.log(`Speed decreased to ${newSpeed}x`);
-    } else if (event.key === "s") {
-      if (video.paused) {
-        video.play();
-        console.log("Video played");
-      } else {
-        video.pause();
-        console.log("Video paused");
+    chrome.runtime.sendMessage({ action: "getCurrentTabUrl" }, (response) => {
+      if (!response || !response.url) return;
+      const currentUrl = response.url;
+
+      switch (event.key) {
+        case "d":
+          adjustSpeed(video, 0.1);
+          break;
+        case "a":
+          adjustSpeed(video, -0.1);
+          break;
+        case "s":
+          video.playbackRate = 1;
+          break;
+        case "b":
+          saveTimestamp(currentUrl);
+          break;
+        case "1":
+          playFromTimestamp(currentUrl, 0);
+          break;
+        case "2":
+          playFromTimestamp(currentUrl, 1);
+          break;
+        case "3":
+          playFromTimestamp(currentUrl, 2);
+          break;
+        case "e":
+          video.currentTime += 10;
+          break;
+        case "q":
+          video.currentTime -= 10;
+          break;
       }
-    } else if (event.key === "e") {
-      video.currentTime += 10;
-      console.log("Advanced 10 seconds");
-    } else if (event.key === "q") {
-      video.currentTime -= 10;
-      console.log("Rewound 10 seconds");
-    }
+    });
   },
   { capture: true }
-); // จับคีย์ก่อนหน้าเว็บ
+);
 
-// รับข้อความจาก Popup
+// === Handle Messages from Popup ===
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Received message:", message);
+
   if (message.action === "playTimestamp") {
-    playFromTimestamp(message.index);
-    sendResponse({ success: true });
+    const video = getVideo();
+    if (!video) {
+      console.error("No video found.");
+      return;
+    }
+    console.log(`Playing at ${message.time}s`);
+    video.currentTime = message.time;
+    video.play();
   }
-  return true; // Async response
 });
+
+// === Initialize Speed UI for existing videos ===
+document.querySelectorAll("video").forEach(createSpeedUI);
+
+// === Observe for new video elements ===
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((m) =>
+    m.addedNodes.forEach((n) => {
+      if (n.tagName === "VIDEO") createSpeedUI(n);
+    })
+  );
+});
+observer.observe(document.documentElement, { childList: true, subtree: true });
