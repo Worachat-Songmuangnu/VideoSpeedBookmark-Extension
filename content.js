@@ -114,11 +114,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const video = getVideo();
     if (!video) {
       console.error("No video found.");
+      sendResponse({ success: false });
       return;
     }
-    console.log(`Playing at ${message.time}s`);
-    video.currentTime = message.time;
-    video.play();
+    chrome.runtime.sendMessage({ action: "getCurrentTabUrl" }, (response) => {
+      if (!response || !response.url) {
+        console.error("Failed to get current URL.");
+        sendResponse({ success: false });
+        return;
+      }
+      playFromTimestamp(response.url, message.index);
+      sendResponse({ success: true });
+    });
+    return true;
   }
 });
 
