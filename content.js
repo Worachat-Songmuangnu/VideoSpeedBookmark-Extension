@@ -97,7 +97,9 @@ function playFromTimestamp(url, index) {
 
     video.currentTime = site.timestamps[index];
     setTimeout(() => video.play(), 100);
-    console.log(`Playing Timestamp ${index + 1}: ${site.timestamps[index]}s`);
+    console.log(
+      `Playing Timestamp ${index + 1}: ${site.timestamps[index]}s for ${url}`
+    );
   });
 }
 
@@ -186,23 +188,15 @@ if (chrome.runtime && chrome.runtime.id) {
         sendResponse({ success: false, message: "No video found." });
         return true;
       }
-      chrome.runtime.sendMessage({ action: "getCurrentTabUrl" }, (response) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({ success: false, message: "Failed to get URL." });
-          return;
-        }
-        if (!response?.url) {
-          sendResponse({ success: false, message: "Failed to get URL." });
-        } else {
-          playFromTimestamp(response.url, message.index);
-          sendResponse({ success: true });
-        }
-      });
+      // ใช้ URL จาก message แทนการดึงใหม่ เพื่อให้ sync กับ Popup
+      playFromTimestamp(message.url, message.index);
+      sendResponse({ success: true });
       return true;
     }
   });
   // === Initialize Speed UI for existing videos ===
   document.querySelectorAll("video").forEach(createSpeedUI);
+
   // === Observe for new video elements ===
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((m) =>

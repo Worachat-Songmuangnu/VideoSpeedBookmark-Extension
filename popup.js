@@ -45,35 +45,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateBookmarks() {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) {
-        showError("No active tab found.");
-        elements.bookmarksDiv.innerHTML = "";
+    chrome.storage.sync.get(["bookmarks"], (result) => {
+      if (chrome.runtime.lastError) {
+        showError("Failed to load bookmarks.");
         return;
       }
 
-      const { url, title } = tabs[0];
-      chrome.storage.sync.get(["bookmarks"], (result) => {
-        if (chrome.runtime.lastError) {
-          showError("Failed to load bookmarks.");
-          return;
-        }
+      const bookmarks = result.bookmarks || {};
+      elements.bookmarksDiv.innerHTML = "";
+      elements.noBookmarksMessage.style.display = "none";
 
-        const bookmarks = result.bookmarks || {};
-        elements.bookmarksDiv.innerHTML = "";
-        elements.noBookmarksMessage.style.display = "none";
+      if (Object.keys(bookmarks).length === 0) {
+        elements.noBookmarksMessage.textContent = "No bookmarks saved.";
+        elements.noBookmarksMessage.style.display = "block";
+        return;
+      }
 
+      for (const url in bookmarks) {
         const site = bookmarks[url];
-        if (!site || !site.timestamps || site.timestamps.length === 0) {
-          elements.noBookmarksMessage.textContent =
-            "No bookmarks for this page.";
-          elements.noBookmarksMessage.style.display = "block";
-          return;
-        }
+        const siteContainer = document.createElement("div");
+        siteContainer.className = "site-container";
 
         const siteTitle = document.createElement("h3");
-        siteTitle.textContent = site.title || title || "Unknown Page";
-        elements.bookmarksDiv.appendChild(siteTitle);
+        siteTitle.textContent = site.title || url;
+        siteContainer.appendChild(siteTitle);
 
         const ul = document.createElement("ul");
         site.timestamps.forEach((time, index) => {
@@ -91,8 +86,9 @@ document.addEventListener("DOMContentLoaded", () => {
           );
           ul.appendChild(li);
         });
-        elements.bookmarksDiv.appendChild(ul);
-      });
+        siteContainer.appendChild(ul);
+        elements.bookmarksDiv.appendChild(siteContainer);
+      }
     });
   }
 
@@ -105,17 +101,39 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playTimestamp(url, index) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return showError("No active tab found.");
-      chrome.tabs.sendMessage(
-        tabs[0].id,
-        { action: "playTimestamp", index },
-        (response) => {
-          if (chrome.runtime.lastError || !response?.success) {
-            showError(response?.message || "Failed to play timestamp.");
+    chrome.tabs.query({ url: url }, (tabs) => {
+      if (tabs.length > 0) {
+        // หน้าเว็บเปิดอยู่ ส่งคำสั่งไป Content Script
+        chrome.tabs.sendMessage(
+          tabs[0].id,
+          { action: "playTimestamp", url, index },
+          (response) => {
+            if (chrome.runtime.lastError || !response?.success) {
+              showError(response?.message || "Failed to play timestamp.");
+            }
           }
-        }
-      );
+        );
+      } else {
+        // หน้าเว็บไม่เปิด สร้างแท็บใหม่และรัน Timestamp
+        chrome.tabs.create({ url, active: true }, (newTab) => {
+          const tabId = newTab.id;
+          const loadListener = (tabIdUpdated, info) => {
+            if (tabIdUpdated === tabId && info.status === "complete") {
+              chrome.tabs.onUpdated.removeListener(loadListener);
+              chrome.tabs.sendMessage(
+                tabId,
+                { action: "playTimestamp", url, index },
+                (response) => {
+                  if (chrome.runtime.lastError || !response?.success) {
+                    showError(response?.message || "Failed to play timestamp.");
+                  }
+                }
+              );
+            }
+          };
+          chrome.tabs.onUpdated.addListener(loadListener);
+        });
+      }
     });
   }
 
