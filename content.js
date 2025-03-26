@@ -1,3 +1,5 @@
+let cachedUrl = null;
+
 // === Utility Functions ===
 function getVideo() {
   const videos = document.querySelectorAll("video");
@@ -9,26 +11,30 @@ function adjustSpeed(video, increment) {
   let speed = video.playbackRate + increment;
   speed = Math.max(0.25, Math.min(4.0, speed));
   video.playbackRate = speed;
-  const label =
-    video.parentNode.querySelector(".speedlabel") ||
-    document.createElement("div");
+
+  let wrapper = video.parentNode.querySelector(".vsb-wrapper");
+  if (!wrapper) {
+    wrapper = document.createElement("div");
+    wrapper.className = "vsb-wrapper";
+    video.parentNode.appendChild(wrapper);
+  }
+
+  let label =
+    wrapper.querySelector(".speedlabel") || document.createElement("div");
   label.className = "speedlabel";
   label.textContent = `${speed.toFixed(2)}x`;
-  video.parentNode.appendChild(label);
+  wrapper.appendChild(label);
 }
 
 function createSpeedUI(video) {
-  const container = video.parentNode;
-  let speedLabel = container.querySelector(".speedlabel");
+  const wrapper = document.createElement("div");
+  wrapper.className = "vsb-wrapper";
+  video.parentNode.appendChild(wrapper);
 
-  if (!speedLabel) {
-    speedLabel = document.createElement("div");
-    speedLabel.className = "speedlabel";
-    container.appendChild(speedLabel);
-  }
-
+  const speedLabel = document.createElement("div");
+  speedLabel.className = "speedlabel";
   speedLabel.textContent = `${video.playbackRate.toFixed(2)}x`;
-  speedLabel.style.display = "block";
+  wrapper.appendChild(speedLabel);
 
   video.onratechange = () => {
     speedLabel.textContent = `${video.playbackRate.toFixed(2)}x`;
@@ -36,114 +42,173 @@ function createSpeedUI(video) {
 }
 
 // === Bookmark Feature ===
-function saveTimestamp(currentUrl) {
+function saveTimestamp(url, title) {
   const video = getVideo();
-  if (!video) return;
+  if (!video) {
+    chrome.runtime.sendMessage({ action: "error", message: "No video found." });
+    return;
+  }
 
   const time = video.currentTime;
   chrome.storage.sync.get(["bookmarks"], (result) => {
+    if (chrome.runtime.lastError) return;
     let bookmarks = result.bookmarks || {};
-    if (!bookmarks[currentUrl]) bookmarks[currentUrl] = [];
-    bookmarks[currentUrl].push(time);
+    const bookmarkTitle = title || document.title || url || "Untitled";
+    bookmarks[url] = bookmarks[url] || { title: bookmarkTitle, timestamps: [] };
+    bookmarks[url].timestamps.push(time);
     chrome.storage.sync.set({ bookmarks }, () => {
-      console.log("Timestamp saved:", time, "for URL:", currentUrl);
+      if (chrome.runtime.lastError) {
+        chrome.runtime.sendMessage({
+          action: "error",
+          message: "Failed to save timestamp.",
+        });
+      } else {
+        console.log(
+          "Timestamp saved:",
+          time,
+          "for:",
+          url,
+          "title:",
+          bookmarkTitle
+        );
+      }
     });
   });
 }
 
-function playFromTimestamp(currentUrl, index) {
+function playFromTimestamp(url, index) {
+  const video = getVideo();
+  if (!video) {
+    chrome.runtime.sendMessage({ action: "error", message: "No video found." });
+    return;
+  }
+
+  chrome.storage.sync.get(["bookmarks"], (result) => {
+    if (chrome.runtime.lastError) return;
+    const bookmarks = result.bookmarks || {};
+    const site = bookmarks[url];
+    if (!site || !site.timestamps || site.timestamps[index] === undefined) {
+      chrome.runtime.sendMessage({
+        action: "error",
+        message: `No timestamp at position ${index + 1}.`,
+      });
+      return;
+    }
+
+    video.currentTime = site.timestamps[index];
+    setTimeout(() => video.play(), 100);
+    console.log(
+      `Playing Timestamp ${index + 1}: ${site.timestamps[index]}s for ${url}`
+    );
+  });
+}
+
+// === Handle Key Events ===
+function handleKeyEvent(event, url, title) {
   const video = getVideo();
   if (!video) return;
 
-  chrome.storage.sync.get(["bookmarks"], (result) => {
-    const bookmarks = result.bookmarks || {};
-    const timestamps = bookmarks[currentUrl] || [];
-    if (timestamps[index] !== undefined) {
-      video.currentTime = timestamps[index];
-      setTimeout(() => video.play(), 100);
-      console.log(`Playing Timestamp ${index + 1}: ${timestamps[index]}s`);
-    }
-  });
+  switch (event.key) {
+    case "d":
+      adjustSpeed(video, 0.1);
+      break;
+    case "a":
+      adjustSpeed(video, -0.1);
+      break;
+    case "s":
+      video.playbackRate = 1;
+      adjustSpeed(video, 0);
+      break;
+    case "b":
+      saveTimestamp(url, title);
+      break;
+    case "1":
+      playFromTimestamp(url, 0);
+      break;
+    case "2":
+      playFromTimestamp(url, 1);
+      break;
+    case "3":
+      playFromTimestamp(url, 2);
+      break;
+    case "e":
+      video.currentTime += 10;
+      break;
+    case "q":
+      video.currentTime -= 10;
+      break;
+  }
 }
 
-// === Keyboard Shortcuts ===
-document.addEventListener(
-  "keydown",
-  (event) => {
-    const video = getVideo();
-    if (!video) return;
-
-    chrome.runtime.sendMessage({ action: "getCurrentTabUrl" }, (response) => {
-      if (!response || !response.url) return;
-      const currentUrl = response.url;
-
-      switch (event.key) {
-        case "d":
-          adjustSpeed(video, 0.1);
-          break;
-        case "a":
-          adjustSpeed(video, -0.1);
-          break;
-        case "s":
-          video.playbackRate = 1;
-          break;
-        case "b":
-          saveTimestamp(currentUrl);
-          break;
-        case "1":
-          playFromTimestamp(currentUrl, 0);
-          break;
-        case "2":
-          playFromTimestamp(currentUrl, 1);
-          break;
-        case "3":
-          playFromTimestamp(currentUrl, 2);
-          break;
-        case "e":
-          video.currentTime += 10;
-          break;
-        case "q":
-          video.currentTime -= 10;
-          break;
-      }
-    });
-  },
-  { capture: true }
-);
-
 // === Handle Messages from Popup ===
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("Received message:", message);
+if (chrome.runtime && chrome.runtime.id) {
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      try {
+        const video = getVideo();
+        if (!video) return;
 
-  if (message.action === "playTimestamp") {
-    const video = getVideo();
-    if (!video) {
-      console.error("No video found.");
-      sendResponse({ success: false });
-      return;
-    }
-    chrome.runtime.sendMessage({ action: "getCurrentTabUrl" }, (response) => {
-      if (!response || !response.url) {
-        console.error("Failed to get current URL.");
-        sendResponse({ success: false });
-        return;
+        if (!cachedUrl) {
+          chrome.runtime.sendMessage(
+            { action: "getCurrentTabUrl" },
+            (response) => {
+              if (chrome.runtime.lastError) return;
+              if (response?.url) {
+                cachedUrl = response.url;
+                handleKeyEvent(event, cachedUrl, response.title);
+              } else {
+                chrome.runtime.sendMessage({
+                  action: "error",
+                  message: "Failed to get tab URL.",
+                });
+              }
+            }
+          );
+        } else {
+          handleKeyEvent(event, cachedUrl);
+        }
+      } catch (e) {
+        if (e.message.includes("Extension context invalidated")) {
+          console.log(
+            "Extension context invalidated. Please reload the page or extension."
+          );
+        } else {
+          console.error("Error in keydown listener:", e);
+        }
       }
-      playFromTimestamp(response.url, message.index);
-      sendResponse({ success: true });
-    });
-    return true;
-  }
-});
-
-// === Initialize Speed UI for existing videos ===
-document.querySelectorAll("video").forEach(createSpeedUI);
-
-// === Observe for new video elements ===
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((m) =>
-    m.addedNodes.forEach((n) => {
-      if (n.tagName === "VIDEO") createSpeedUI(n);
-    })
+    },
+    { capture: true }
   );
-});
-observer.observe(document.documentElement, { childList: true, subtree: true });
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "playTimestamp") {
+      const video = getVideo();
+      if (!video) {
+        sendResponse({ success: false, message: "No video found." });
+        return true;
+      }
+      // ใช้ URL จาก message แทนการดึงใหม่ เพื่อให้ sync กับ Popup
+      playFromTimestamp(message.url, message.index);
+      sendResponse({ success: true });
+      return true;
+    }
+  });
+  // === Initialize Speed UI for existing videos ===
+  document.querySelectorAll("video").forEach(createSpeedUI);
+
+  // === Observe for new video elements ===
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((m) =>
+      m.addedNodes.forEach((n) => {
+        if (n.tagName === "VIDEO") createSpeedUI(n);
+      })
+    );
+  });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+} else {
+  console.log("Extension context not available on load.");
+}
