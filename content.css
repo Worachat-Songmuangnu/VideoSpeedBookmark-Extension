@@ -1,0 +1,27 @@
+.vsb-wrapper {
+    position: relative;
+  }
+  
+  .speedlabel {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.3);
+    color: #222;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    display: block;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .dark-mode .speedlabel {
+    background: rgba(0, 0, 0, 0.7);
+    color: #eee;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+  }
